@@ -55,8 +55,10 @@ void ThreadPool::worker(){
 }
 
 ThreadPool::~ThreadPool(){
-    std::unique_lock<std::mutex> lock(queue_mutex);
-    stop = true;
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex);
+        stop = true;
+    }
     cv.notify_all();
 
     for (std::thread &worker : workers){
