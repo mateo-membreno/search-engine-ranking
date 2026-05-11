@@ -4,7 +4,7 @@
 
 
 
-ThreadPool::ThreadPool(int num_threads){
+ThreadPool::ThreadPool(size_t num_threads){
     workers.reserve(num_threads);
     for(size_t i = 0; i < num_threads; i++){
         workers.emplace_back([this] {
@@ -37,7 +37,7 @@ void ThreadPool::worker(){
             std::unique_lock lock(queue_mutex);
 
             cv.wait(lock, [this]{
-                return !task_queue.empty() || stop == true
+                return !task_queue.empty() || stop == true;
             });
 
             if (stop == true || task_queue.empty()){
