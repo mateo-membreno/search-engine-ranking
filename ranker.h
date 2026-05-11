@@ -60,9 +60,10 @@ public:
   };
 
   void serial_rank(const std::vector<RankDoc>& all_docs);
-  void parallel_rank(const std::vector<RankDoc>& all_docs, ThreadPool& pool);
+  void parallel_rank_a(const std::vector<RankDoc>& all_docs, ThreadPool& pool);
+  void parallel_rank_b(const std::vector<RankDoc>& all_docs, ThreadPool& pool);
 
-  std::vector<RankedResult> TopResults() const;
+  std::vector<RankedResult> TopResults();
 
 private:
   struct WeightedStrategy

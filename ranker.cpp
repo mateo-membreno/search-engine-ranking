@@ -97,13 +97,18 @@ double Ranker::ScoreDetailed(const RankDoc& doc, std::vector<double>& out_scores
 
 void Ranker::serial_rank(const std::vector<RankDoc>& all_docs)
 {
+  std::vector<double> per_strategy;
+  per_strategy.reserve(Strategies.size());
+
   for (size_t doc_idx = 0; doc_idx < all_docs.size(); ++doc_idx)
   {
     const RankDoc& doc = all_docs[doc_idx];
     if (doc.url.empty()) continue;
 
-    std::vector<double> per_strategy;
     const double score = ScoreDetailed(doc, per_strategy);
+
+    if (Top10.size() == MaxResults_ && score <= Top10.top().score)
+      continue;
 
     RankedResult r;
     r.url             = doc.url;
@@ -112,7 +117,7 @@ void Ranker::serial_rank(const std::vector<RankDoc>& all_docs)
     r.seedDomainDepth = doc.seedDomainDepth;
     r.title           = doc.title.empty() ? doc.url : doc.title;
     r.score           = score;
-    r.strategy_scores = std::move(per_strategy);
+    r.strategy_scores = per_strategy;  // copy, not move — keeps per_strategy's capacity
     r.shardOrdinal    = doc.shardOrdinal;
     r.insertionIndex  = doc_idx;
 
@@ -122,7 +127,7 @@ void Ranker::serial_rank(const std::vector<RankDoc>& all_docs)
   }
 }
 
-void Ranker::parallel_rank(const std::vector<RankDoc>& all_docs, ThreadPool& pool)
+void Ranker::parallel_rank_a(const std::vector<RankDoc>& all_docs, ThreadPool& pool)
 {
   constexpr size_t chunk_size = 500;
   const size_t total = all_docs.size();
@@ -143,6 +148,9 @@ void Ranker::parallel_rank(const std::vector<RankDoc>& all_docs, ThreadPool& poo
         std::vector<double> per_strategy;
         const double score = ScoreDetailed(doc, per_strategy);
 
+        if (local_top.size() == MaxResults_ && score <= local_top.top().score)
+          continue;
+        
         RankedResult r;
         r.url             = doc.url;
         r.domain          = doc.domain;
@@ -152,7 +160,8 @@ void Ranker::parallel_rank(const std::vector<RankDoc>& all_docs, ThreadPool& poo
         r.score           = score;
         r.strategy_scores = std::move(per_strategy);
         r.shardOrdinal    = doc.shardOrdinal;
-        r.insertionIndex  = doc_idx;  
+        r.insertionIndex  = doc_idx;
+
         local_top.push(std::move(r));
         if (local_top.size() > MaxResults_)
           local_top.pop();
@@ -176,15 +185,74 @@ void Ranker::parallel_rank(const std::vector<RankDoc>& all_docs, ThreadPool& poo
   pool.wait();
 }
 
-std::vector<Ranker::RankedResult> Ranker::TopResults() const
+void Ranker::parallel_rank_b(const std::vector<RankDoc>& all_docs, ThreadPool& pool)
 {
-  auto copy = Top10;
-  std::vector<RankedResult> result;
-  result.reserve(copy.size());
-  while (!copy.empty())
+  constexpr size_t chunk_size = 500;
+  const size_t total = all_docs.size();
+
+  for (size_t i = 0; i < total; i += chunk_size)
   {
-    result.push_back(copy.top());
-    copy.pop();
+    const size_t end = std::min(i + chunk_size, total);
+
+    pool.enqueue([this, i, end, &all_docs]()
+    {
+      std::priority_queue<RankedResult, std::vector<RankedResult>, std::greater<RankedResult>> local_top;
+
+      std::vector<double> per_strategy;
+      per_strategy.reserve(Strategies.size());
+
+      for (size_t doc_idx = i; doc_idx < end; ++doc_idx)
+      {
+        const RankDoc& doc = all_docs[doc_idx];
+        if (doc.url.empty()) continue;
+
+        const double score = ScoreDetailed(doc, per_strategy);
+
+        if (local_top.size() == MaxResults_ && score <= local_top.top().score)
+          continue;
+
+        RankedResult r;
+        r.url             = doc.url;
+        r.domain          = doc.domain;
+        r.depth           = doc.depth;
+        r.seedDomainDepth = doc.seedDomainDepth;
+        r.title           = doc.title.empty() ? doc.url : doc.title;
+        r.score           = score;
+        r.strategy_scores = per_strategy;
+        r.shardOrdinal    = doc.shardOrdinal;
+        r.insertionIndex  = doc_idx;
+
+        local_top.push(std::move(r));
+        if (local_top.size() > MaxResults_)
+          local_top.pop();
+      }
+
+      std::lock_guard<std::mutex> lock(results_mutex_);
+      while (!local_top.empty())
+      {
+        RankedResult candidate = local_top.top();
+        local_top.pop();
+        if (Top10.size() < MaxResults_ || candidate > Top10.top())
+        {
+          Top10.push(std::move(candidate));
+          if (Top10.size() > MaxResults_)
+            Top10.pop();
+        }
+      }
+    });
+  }
+
+  pool.wait();
+}
+
+std::vector<Ranker::RankedResult> Ranker::TopResults()
+{
+  std::vector<RankedResult> result;
+  result.reserve(Top10.size());
+  while (!Top10.empty())
+  {
+    result.push_back(Top10.top());
+    Top10.pop();
   }
   std::sort(result.begin(), result.end(),
             [](const RankedResult& a, const RankedResult& b) { return a > b; });
