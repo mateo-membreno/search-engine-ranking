@@ -30,5 +30,5 @@ private:
     std::condition_variable cv_done;
 
     std::atomic<size_t> active_tasks{0};
-    bool stop{false};
+    std::atomic<bool> stop{false};
 };
