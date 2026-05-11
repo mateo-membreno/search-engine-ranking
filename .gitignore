@@ -7,3 +7,5 @@ bench
 main
 *.o
 *.dSYM/
+*.trace
+*.DS_Store

@@ -55,10 +55,13 @@ for (const auto& r : ranker.TopResults())
 
 
 
-## Speed
+### Performance Benchmarks (8 Threads)
 
-1000000 docs        serial 404ms    (8 threads) parallel_a 160ms  2.525x   parallel_b 89ms  4.53933x
-1000000 docs        serial 392ms    (8 threads) parallel_a 165ms  2.37576x parallel_b 87ms  4.50575x
-1000000 docs        serial 390ms    (8 threads) parallel_a 159ms  2.45283x parallel_b 88ms  4.43182x
-1000000 docs        serial 386ms    (8 threads) parallel_a 161ms  2.39752x parallel_b 85ms  4.54118x
-1000000 docs        serial 386ms    (8 threads) parallel_a 159ms  2.42767x parallel_b 87ms  4.43678x
+| Iteration | Document Count | Serial Time | Parallel A | A Speedup | Parallel B | B Speedup |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | 1,000,000 | 404ms | 160ms | **2.53x** | 89ms | **4.54x** |
+| 2 | 1,000,000 | 392ms | 165ms | **2.38x** | 87ms | **4.51x** |
+| 3 | 1,000,000 | 390ms | 159ms | **2.45x** | 88ms | **4.43x** |
+| 4 | 1,000,000 | 386ms | 161ms | **2.40x** | 85ms | **4.54x** |
+| 5 | 1,000,000 | 386ms | 159ms | **2.43x** | 87ms | **4.44x** |
+| **AVG** | **1,000,000** | **391.6ms** | **160.8ms** | **2.44x** | **87.2ms** | **4.49x** |
