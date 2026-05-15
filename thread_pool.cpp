@@ -40,9 +40,8 @@ void ThreadPool::worker(){
                 return !task_queue.empty() || stop == true;
             });
 
-            if (stop == true || task_queue.empty()){
-                return;
-            }
+            if (stop == true) return;
+            if (task_queue.empty()) continue;
 
             task = std::move(task_queue.front());
             task_queue.pop();
