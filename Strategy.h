@@ -13,7 +13,7 @@
 class DomainStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const std::string& domain = doc.domain;
     for (const char* s : TopTier)
@@ -35,7 +35,7 @@ class ShortURLStrat : public Ranker::Strategy
 {
   // piecewise linear: 1.0 for urls <= short_thres, linearly drops to 0.0 at long_thres
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const double len = static_cast<double>(doc.url.size());
     if (len <= short_thres) return 1.0;
@@ -52,7 +52,7 @@ class ShortTitleStrat : public Ranker::Strategy
 {
   // piecewise linear: 1.0 for titles <= short_thres words, linearly drops to 0.0 at long_thres
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const double words = static_cast<double>(doc.title_word_count);
     if (words <= short_thres) return 1.0;
@@ -69,7 +69,7 @@ class OutlinkCount : public Ranker::Strategy
 {
   // capped log scale: pages with 32+ outlinks all score 1.0
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.outlink_count == 0)
       return 0.0;
@@ -82,7 +82,7 @@ class UrlDepth : public Ranker::Strategy
 {
   // number of link clicks from seed to get to page
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const double d = static_cast<double>(doc.depth);
     if (d <= shallow_thres) return 1.0;
@@ -99,7 +99,7 @@ class SeedDomainDepth : public Ranker::Strategy
 {
   // number of domain switches from the seed
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const double d = static_cast<double>(doc.seedDomainDepth);
     if (d <= shallow_thres) return 1.0;
@@ -116,7 +116,7 @@ class UrlPathDepth : public Ranker::Strategy
 {
   // 1.0 for 0-1 path segments, linearly drops to 0.0 at max_depth segments
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const std::string& url = doc.url;
 
@@ -154,7 +154,7 @@ class QueryParamPenalty : public Ranker::Strategy
 {
   // returns 1.0 when the URL contains a "q=" query parameter (search-within-search)
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const std::string& url = doc.url;
     if (url.find("?q=")    != std::string::npos ||
@@ -173,10 +173,9 @@ class UrlTermPresenceStrat : public Ranker::Strategy
 {
   // fraction of query terms that appear anywhere in the URL
 public:
-  explicit UrlTermPresenceStrat(const std::vector<std::string>& query_terms)
-      : QueryTerms(query_terms) {}
+  void SetQuery(const std::vector<std::string>& query) override { QueryTerms = query; }
 
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (QueryTerms.empty())
       return 0.0;
@@ -196,10 +195,9 @@ class UrlTermProximityStrat : public Ranker::Strategy
   // how ordered and compact the matched query terms are within the URL.
   // returns 0.0 if fewer than 2 terms are matched in order.
 public:
-  explicit UrlTermProximityStrat(const std::vector<std::string>& query_terms)
-      : QueryTerms(query_terms) {}
+  void SetQuery(const std::vector<std::string>& query) override { QueryTerms = query; }
 
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     const std::string& url    = doc.url;
     const size_t query_len    = QueryTerms.size();
@@ -261,7 +259,7 @@ private:
 class ExactPhraseBodyStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.body_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -272,7 +270,7 @@ public:
 class ExactPhraseTitleStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.title_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -283,7 +281,7 @@ public:
 class ExactPhraseAnchorStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.anchor_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -298,7 +296,7 @@ public:
 class OrderingBodyStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.body_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -309,7 +307,7 @@ public:
 class OrderingTitleStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.title_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -320,7 +318,7 @@ public:
 class OrderingAnchorStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.anchor_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -335,7 +333,7 @@ public:
 class EarlyMatchBodyStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.body_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -346,7 +344,7 @@ public:
 class EarlyMatchTitleStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.title_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -357,7 +355,7 @@ public:
 class EarlyMatchAnchorStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.anchor_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -372,7 +370,7 @@ public:
 class CoverageBodyStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.body_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -383,7 +381,7 @@ public:
 class CoverageTitleStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.title_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -394,7 +392,7 @@ public:
 class CoverageAnchorStrat : public Ranker::Strategy
 {
 public:
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (doc.anchor_term_positions == nullptr) return 0.0;
     using namespace ranking_strategy_detail;
@@ -410,10 +408,9 @@ class ExactTitleMatch : public Ranker::Strategy
 {
   // all query terms appear as a consecutive phrase in the title and the title has no extra words
 public:
-  explicit ExactTitleMatch(const std::vector<std::string>& query_terms)
-      : QueryTermCount(query_terms.size()) {}
+  void SetQuery(const std::vector<std::string>& query) override { QueryTermCount = query.size(); }
 
-  double Score(const RankDoc& doc) const
+  double Score(const RankDoc& doc) const override
   {
     if (QueryTermCount == 0 || doc.title_term_positions == nullptr)
       return 0.0;
@@ -427,3 +424,37 @@ public:
 private:
   size_t QueryTermCount{0};
 };
+
+// ---------------------------------------------------------------------------
+// Convenience: register the full default set of 23 strategies.
+// Indices match the order below, which is the same as the old RankerWeights
+// field order, so SetWeight(index, w) still maps 1:1 to each named signal.
+// ---------------------------------------------------------------------------
+
+inline void RegisterAllStrategies(Ranker& ranker)
+{
+  // [0]  document quality
+  ranker.AddStrategy(new DomainStrat());
+  ranker.AddStrategy(new ShortURLStrat());
+  ranker.AddStrategy(new ShortTitleStrat());
+  ranker.AddStrategy(new OutlinkCount());
+  ranker.AddStrategy(new UrlDepth());
+  ranker.AddStrategy(new SeedDomainDepth());
+  ranker.AddStrategy(new UrlPathDepth());
+  ranker.AddStrategy(new QueryParamPenalty());
+  ranker.AddStrategy(new UrlTermPresenceStrat());
+  ranker.AddStrategy(new UrlTermProximityStrat());
+  ranker.AddStrategy(new ExactPhraseTitleStrat());
+  ranker.AddStrategy(new ExactPhraseBodyStrat());
+  ranker.AddStrategy(new ExactPhraseAnchorStrat());
+  ranker.AddStrategy(new OrderingTitleStrat());
+  ranker.AddStrategy(new OrderingBodyStrat());
+  ranker.AddStrategy(new OrderingAnchorStrat());
+  ranker.AddStrategy(new EarlyMatchTitleStrat());
+  ranker.AddStrategy(new EarlyMatchBodyStrat());
+  ranker.AddStrategy(new EarlyMatchAnchorStrat());
+  ranker.AddStrategy(new CoverageTitleStrat());
+  ranker.AddStrategy(new CoverageBodyStrat());
+  ranker.AddStrategy(new CoverageAnchorStrat());
+  ranker.AddStrategy(new ExactTitleMatch());
+}

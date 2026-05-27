@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ranking_doc.h"
-#include "ranker_weights.h"
 #include "thread_pool.h"
 
 #include <cstddef>
@@ -14,9 +13,7 @@
 class Ranker
 {
 public:
-  explicit Ranker(const std::vector<std::string>& query_terms,
-                  const char* weights_path = nullptr,
-                  size_t maxResults = 10);
+  explicit Ranker(size_t maxResults = 10);
   ~Ranker();
 
   Ranker(const Ranker&)            = delete;
@@ -27,11 +24,17 @@ public:
   public:
     virtual ~Strategy() = default;
     virtual double Score(const RankDoc& doc) const = 0;
+    virtual void SetQuery(const std::vector<std::string>&) {}
   };
+
+  void AddStrategy(Strategy* strategy, double weight = 1.0);
+
+  void SetWeight(size_t index, double weight);
+
+  void SetQuery(const std::vector<std::string>& query);
 
   void SetMaxResults(size_t maxResults);
   void ResetResults();
-  void SetWeights(const RankerWeights& weights);
 
   double ScoreDetailed(const RankDoc& doc, std::vector<double>& out_scores) const;
 

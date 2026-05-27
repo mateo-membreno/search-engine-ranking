@@ -133,15 +133,15 @@ for (const auto& r : ranker.TopResults())
 
 ---
 
-## Performance Benchmarks (8 Threads, 1,000,000 documents)
+## Performance Benchmarks (8 Threads)
 
 | Iteration | Serial | Parallel A | A Speedup | Parallel B | B Speedup |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1 | 404 ms | 160 ms | **2.53×** | 89 ms | **4.54×** |
-| 2 | 392 ms | 165 ms | **2.38×** | 87 ms | **4.51×** |
-| 3 | 390 ms | 159 ms | **2.45×** | 88 ms | **4.43×** |
-| 4 | 386 ms | 161 ms | **2.40×** | 85 ms | **4.54×** |
-| 5 | 386 ms | 159 ms | **2.43×** | 87 ms | **4.44×** |
-| **Avg** | **391.6 ms** | **160.8 ms** | **2.44×** | **87.2 ms** | **4.49×** |
+| 1 | 2.48M docs/s | 6.25M docs/s | **2.53×** | 11.24M docs/s | **4.54×** |
+| 2 | 2.55M docs/s | 6.06M docs/s | **2.38×** | 11.49M docs/s | **4.51×** |
+| 3 | 2.56M docs/s | 6.29M docs/s | **2.45×** | 11.36M docs/s | **4.43×** |
+| 4 | 2.59M docs/s | 6.21M docs/s | **2.40×** | 11.76M docs/s | **4.54×** |
+| 5 | 2.59M docs/s | 6.29M docs/s | **2.43×** | 11.49M docs/s | **4.44×** |
+| **Avg** | **2.55M docs/s** | **6.22M docs/s** | **2.44×** | **11.47M docs/s** | **4.49×** |
 
-`parallel_rank_b` achieves roughly **4.5× speedup** on 8 threads — about 56% parallel efficiency — with the gap over `parallel_rank_a` attributable almost entirely to eliminated per-document allocations.
+`parallel_rank_b` sustains roughly **11.5M docs/s** on 8 threads — about 56% parallel efficiency — with the gap over `parallel_rank_a` attributable almost entirely to eliminated per-document allocations.
