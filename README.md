@@ -16,7 +16,7 @@ Throughput across all three query complexities at 8 threads:
 
 ## Redacted Files
 
-`ranking_detail.h` and `ranker_weights.h` are redacted at the request of the course to prevent copying, as the entire system was submitted for a class project. The following are omitted:
+`ranking_detail.h` and `ranker_weights.h` are redacted at the request of the course to prevent copying, as the entire system was submitted for a class project. Ranking and Strategy files are modified/improved, while the following are omitted:
 
 - **Ranker weights** — weight-loading function and scoring coefficients (`ranker_weights.h`)
 - **Exact phrase match algorithm** (`ranking_detail.h`)
@@ -24,7 +24,6 @@ Throughput across all three query complexities at 8 threads:
 - **Term coverage algorithm** (`ranking_detail.h`)
 - **Early term match score algorithm** (`ranking_detail.h`)
 
-`ranker.h`, `ranker.cpp`, and `Strategy.h` reflect changes made to actual ranker and cannot just be plugged into our existing system.
 ---
 
 ## Architecture
