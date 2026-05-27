@@ -2,11 +2,21 @@
 
 A C++ document ranking system built on a custom thread pool. The ranker scores candidate documents across 23 weighted signals and returns the top-K results. Three ranking modes are provided: a single-threaded baseline and two parallel variants that demonstrate the allocation cost of per-document heap vectors.
 
+Throughput across all three query complexities at 8 threads:
+
+| Query complexity | Serial | 8 threads | Speedup |
+| :---: | :---: | :---: | :---: |
+| 1 term | 4.5M docs/s | 21.8M docs/s | **4.8×** |
+| 3 terms | 2.5M docs/s | 12.3M docs/s | **4.9×** |
+| 6 terms | 1.5M docs/s | 7.8M docs/s | **5.2×** |
+
+![Scaling graph](bench_out.png)
+
 ---
 
 ## Redacted Files
 
-`ranking_detail.h` and `ranker_weights.h` are partially redacted at the request of the original course instructor to prevent copying, as this ranking system was submitted as a class project. The following are omitted:
+`ranking_detail.h` and `ranker_weights.h` are redacted at the request of the course to prevent copying, as the entire system was submitted for a class project. The following are omitted:
 
 - **Ranker weights** — weight-loading function and scoring coefficients (`ranker_weights.h`)
 - **Exact phrase match algorithm** (`ranking_detail.h`)
@@ -14,10 +24,7 @@ A C++ document ranking system built on a custom thread pool. The ranker scores c
 - **Term coverage algorithm** (`ranking_detail.h`)
 - **Early term match score algorithm** (`ranking_detail.h`)
 
-`ranker.h`, `ranker.cpp`, and `Strategy.h` are intact.
-
-> **Note:** The ranking code in this repository reflects improvements made after the original submission and is not identical to what was turned in.
-
+`ranker.h`, `ranker.cpp`, and `Strategy.h` reflect changes made to actual ranker and cannot just be plugged into our existing system. 
 ---
 
 ## Architecture
@@ -39,7 +46,7 @@ The ranker implements a weighted, additive scoring model using the [Strategy pat
 score(doc) = Σ weight_i × strategy_i.Score(doc)
 ```
 
-Weights are loaded from a file at construction time; if no path is provided, all weights default to `1.0`. Each call to `ScoreDetailed` returns both the combined score and the per-strategy breakdown, which is stored on each `RankedResult` for inspection.
+Strategies are registered once at startup via `AddStrategy`. Three strategies are query-dependent (`UrlTermPresenceStrat`, `UrlTermProximityStrat`, `ExactTitleMatch`) and update their internal state through `SetQuery` — all others are stateless and need no per-query work. Each call to `ScoreDetailed` returns both the combined score and the per-strategy breakdown, stored on each `RankedResult` for inspection.
 
 Results are maintained in a min-heap of size K (default 10). A document is only inserted if its score exceeds the current minimum, keeping memory and merge cost proportional to K rather than the full corpus size.
 
@@ -53,21 +60,21 @@ The 23 strategies are organized into four groups:
 
 | Strategy | Description |
 | :--- | :--- |
-| `DomainStrat` | TLD tier score: `.edu`/`.gov`/`.org` → 1.0, `.com` → 0.6, `.xyz`/`.net`/`.io` → 0.3, other → 0.15 |
-| `ShortURLStrat` | Piecewise linear: 1.0 for URLs ≤ 10 chars, drops to 0.0 at 120 chars |
-| `ShortTitleStrat` | Piecewise linear: 1.0 for titles ≤ 5 words, drops to 0.0 at 15 words |
-| `OutlinkCount` | Log₂-scaled outlink count, capped at 1.0 for 32+ outlinks |
-| `UrlDepth` | Crawl depth from seed: 1.0 for depth ≤ 2, drops to 0.0 at depth 8 |
-| `SeedDomainDepth` | Domain-hop count from seed: 1.0 for ≤ 1 hop, drops to 0.0 at 5 hops |
-| `UrlPathDepth` | URL path segments: 1.0 for 0–1 segments, drops to 0.0 at 6 segments |
-| `QueryParamPenalty` | Returns 1.0 if the URL contains a `q=` parameter (search-within-search signal) |
+| `DomainStrat` | Scores by TLD tier — academic, government, and non-profit domains rank highest |
+| `ShortURLStrat` | Prefers shorter URLs, penalizing very long ones |
+| `ShortTitleStrat` | Prefers concise page titles, penalizing overly long ones |
+| `OutlinkCount` | Rewards pages that link out to many other pages using a logarithmic scale |
+| `UrlDepth` | Prefers pages reachable in fewer crawl hops from the seed |
+| `SeedDomainDepth` | Prefers pages reachable with fewer domain switches from the seed |
+| `UrlPathDepth` | Prefers pages with shallow URL paths |
+| `QueryParamPenalty` | Penalizes URLs containing a search query parameter, indicating a search-within-search page |
 
 ### Query–URL Match
 
 | Strategy | Description |
 | :--- | :--- |
-| `UrlTermPresenceStrat` | Fraction of query terms that appear anywhere in the URL |
-| `UrlTermProximityStrat` | Finds the longest ordered subsequence of query terms in the URL and scores by compactness: `(matched / total) × 1 / (1 + gap_chars)` |
+| `UrlTermPresenceStrat` | Scores by how many query terms appear anywhere in the URL |
+| `UrlTermProximityStrat` | Scores by how compactly and in-order query terms appear within the URL |
 
 ### Content Signals (Body / Title / Anchor)
 
@@ -75,23 +82,22 @@ Each of the four algorithms below is applied independently to three text fields,
 
 | Algorithm | Description |
 | :--- | :--- |
-| **Exact phrase** | Binary: 1.0 if all query terms appear consecutively in the correct order, 0.0 otherwise |
-| **Term ordering** | Continuous score for how well the relative order of query terms matches their order in the document |
+| **Exact phrase** | Rewards documents where all query terms appear consecutively in the correct order |
+| **Term ordering** | Rewards documents where query terms appear in the same relative order as the query |
 | **Early match** | Rewards documents where query terms appear near the beginning of the content |
-| **Term coverage** | Fraction of distinct query terms that appear at least once in the field |
+| **Term coverage** | Rewards documents where more of the distinct query terms are present in the field |
 
 ### Composite
 
 | Strategy | Description |
 | :--- | :--- |
-| `ExactTitleMatch` | 1.0 only if the title consists of exactly the query terms in order with no extra words — a strict, high-signal match |
+| `ExactTitleMatch` | Rewards pages whose title consists of exactly the query terms |
 
 ---
 
 ## Parallel Ranking
 
 The document corpus is split into chunks of 500 docs. Each chunk is submitted as a task to the thread pool. Workers maintain a **local** min-heap of size K and only acquire the global mutex once per chunk to merge their local results into the shared top-K heap. This keeps lock contention proportional to the number of chunks, not the number of documents.
-
 
 | Method | Allocation | Notes |
 | :--- | :--- | :--- |
@@ -102,46 +108,18 @@ The document corpus is split into chunks of 500 docs. Each chunk is submitted as
 
 ---
 
-## Usage
+## Performance Benchmarks
 
-```cpp
-std::vector<std::string> query = {"open", "source", "search"};
+All results use `parallel_rank_b` on 1,000,000 documents (3-term query, 3 run median, Apple M-series 8-core).
 
-// RankDoc holds raw pointers into per-document position data and does not own them.
-// The position store must outlive the ranking call.
-std::vector<std::vector<std::vector<size_t>>> position_store = { /* ... */ };
-//  ^ outer:  one entry per document
-//      ^ middle: one entry per query term
-//          ^ inner: sorted absolute word positions where that term appears
+| Threads | Throughput | Speedup vs serial |
+| :---: | :---: | :---: |
+| serial | 2.5M docs/s | 1.0× |
+| 1 | 2.4M docs/s | 0.96× |
+| 4 | 8.9M docs/s | 3.6× |
+| 8 | 12.3M docs/s | **4.9×** |
+| 16 | 13.8M docs/s | 5.5× |
+| 32 | 14.1M docs/s | 5.6× |
+| 50 | 13.9M docs/s | 5.6× |
 
-std::vector<RankDoc> docs;
-// populate docs[i].body_term_positions = &position_store[i], etc.
-
-ThreadPool pool(std::thread::hardware_concurrency());
-
-// Ranker(query_terms, weights_path, max_results)
-// Pass nullptr for weights_path to use unit weights.
-Ranker ranker(query, nullptr, 10);
-
-ranker.parallel_rank_b(docs, pool);
-
-for (const auto& r : ranker.TopResults())
-    std::cout << r.score << "  " << r.url << "\n";
-```
-
-`TopResults()` returns results sorted highest-score first. Ties are broken by document position in the input vector (earlier index wins).
-
----
-
-## Performance Benchmarks (8 Threads)
-
-| Iteration | Serial | Parallel A | A Speedup | Parallel B | B Speedup |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| 1 | 2.48M docs/s | 6.25M docs/s | **2.53×** | 11.24M docs/s | **4.54×** |
-| 2 | 2.55M docs/s | 6.06M docs/s | **2.38×** | 11.49M docs/s | **4.51×** |
-| 3 | 2.56M docs/s | 6.29M docs/s | **2.45×** | 11.36M docs/s | **4.43×** |
-| 4 | 2.59M docs/s | 6.21M docs/s | **2.40×** | 11.76M docs/s | **4.54×** |
-| 5 | 2.59M docs/s | 6.29M docs/s | **2.43×** | 11.49M docs/s | **4.44×** |
-| **Avg** | **2.55M docs/s** | **6.22M docs/s** | **2.44×** | **11.47M docs/s** | **4.49×** |
-
-`parallel_rank_b` sustains roughly **11.5M docs/s** on 8 threads — about 56% parallel efficiency — with the gap over `parallel_rank_a` attributable almost entirely to eliminated per-document allocations.
+Scaling plateaus around hardware concurrency (8 threads). Beyond that, throughput stays flat because threads context switch on the same cores. The gap between `parallel_rank_a` and `parallel_rank_b` is due almost entirely to eliminated per-document heap allocations inside each chunk.
