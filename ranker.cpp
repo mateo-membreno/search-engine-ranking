@@ -1,39 +1,11 @@
 #include "ranker.h"
 #include "ranking_detail.h"
-#include "ranker_weights.h"
-#include "Strategy.h"
 
 #include <algorithm>
 
-Ranker::Ranker(const std::vector<std::string>& query_terms, const char* weights_path, size_t maxResults)
+Ranker::Ranker(size_t maxResults)
 {
   SetMaxResults(maxResults);
-
-  Strategies.push_back({new DomainStrat()});
-  Strategies.push_back({new ShortURLStrat()});
-  Strategies.push_back({new ShortTitleStrat()});
-  Strategies.push_back({new OutlinkCount()});
-  Strategies.push_back({new UrlDepth()});
-  Strategies.push_back({new SeedDomainDepth()});
-  Strategies.push_back({new UrlPathDepth()});
-  Strategies.push_back({new QueryParamPenalty()});
-  Strategies.push_back({new UrlTermPresenceStrat(query_terms)});
-  Strategies.push_back({new UrlTermProximityStrat(query_terms)});
-  Strategies.push_back({new ExactPhraseTitleStrat()});
-  Strategies.push_back({new ExactPhraseBodyStrat()});
-  Strategies.push_back({new ExactPhraseAnchorStrat()});
-  Strategies.push_back({new OrderingTitleStrat()});
-  Strategies.push_back({new OrderingBodyStrat()});
-  Strategies.push_back({new OrderingAnchorStrat()});
-  Strategies.push_back({new EarlyMatchTitleStrat()});
-  Strategies.push_back({new EarlyMatchBodyStrat()});
-  Strategies.push_back({new EarlyMatchAnchorStrat()});
-  Strategies.push_back({new CoverageTitleStrat()});
-  Strategies.push_back({new CoverageBodyStrat()});
-  Strategies.push_back({new CoverageAnchorStrat()});
-  Strategies.push_back({new ExactTitleMatch(query_terms)});
-
-  SetWeights(weights_path ? LoadRankerWeights(weights_path) : RankerWeights{});
 }
 
 Ranker::~Ranker()
@@ -53,31 +25,21 @@ void Ranker::ResetResults()
   insertionCount_ = 0;
 }
 
-void Ranker::SetWeights(const RankerWeights& w)
+void Ranker::AddStrategy(Strategy* strategy, double weight)
 {
-  Strategies[0].weight  = w.domain;
-  Strategies[1].weight  = w.short_url;
-  Strategies[2].weight  = w.short_title;
-  Strategies[3].weight  = w.outlink_count;
-  Strategies[4].weight  = w.url_depth;
-  Strategies[5].weight  = w.seed_domain_depth;
-  Strategies[6].weight  = w.url_path_depth;
-  Strategies[7].weight  = w.query_param_penalty;
-  Strategies[8].weight  = w.url_term_presence;
-  Strategies[9].weight  = w.url_term_proximity;
-  Strategies[10].weight = w.exact_phrase_title;
-  Strategies[11].weight = w.exact_phrase_body;
-  Strategies[12].weight = w.exact_phrase_anchor;
-  Strategies[13].weight = w.ordering_title;
-  Strategies[14].weight = w.ordering_body;
-  Strategies[15].weight = w.ordering_anchor;
-  Strategies[16].weight = w.early_match_title;
-  Strategies[17].weight = w.early_match_body;
-  Strategies[18].weight = w.early_match_anchor;
-  Strategies[19].weight = w.coverage_title;
-  Strategies[20].weight = w.coverage_body;
-  Strategies[21].weight = w.coverage_anchor;
-  Strategies[22].weight = w.exact_title_match;
+  Strategies.push_back({strategy, weight});
+}
+
+void Ranker::SetWeight(size_t index, double weight)
+{
+  if (index < Strategies.size())
+    Strategies[index].weight = weight;
+}
+
+void Ranker::SetQuery(const std::vector<std::string>& query)
+{
+  for (const WeightedStrategy& ws : Strategies)
+    ws.strategy->SetQuery(query);
 }
 
 double Ranker::ScoreDetailed(const RankDoc& doc, std::vector<double>& out_scores) const
