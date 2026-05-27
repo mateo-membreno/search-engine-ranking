@@ -1,4 +1,4 @@
-# Thread Pool & Search Ranker
+# Search Ranker
 
 A C++ document ranking system built on a custom thread pool. The ranker scores candidate documents across 23 weighted signals and returns the top-K results. Three ranking modes are provided: a single-threaded baseline and two parallel variants that demonstrate the allocation cost of per-document heap vectors.
 
