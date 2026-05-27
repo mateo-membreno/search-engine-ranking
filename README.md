@@ -24,9 +24,7 @@ Throughput across all three query complexities at 8 threads:
 - **Term coverage algorithm** (`ranking_detail.h`)
 - **Early term match score algorithm** (`ranking_detail.h`)
 
-
-
-`ranker.h`, `ranker.cpp`, and `Strategy.h` reflect changes made to actual ranker and cannot just be plugged into our existing system. 
+`ranker.h`, `ranker.cpp`, and `Strategy.h` reflect changes made to actual ranker and cannot just be plugged into our existing system.
 ---
 
 ## Architecture
